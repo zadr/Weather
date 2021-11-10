@@ -2,6 +2,9 @@
 ![](screenshot.png)
 
 ## How It Works
+It doesn't, as of Monterey.
+
+## How It Used To Work
 Combine two parts WeatherKit, one part CoreLocation, and sprinkle on a dash of AppKit. Mix it all together with Xcode, and voila; got yourself an app.
 
 ## WeatherKit?
