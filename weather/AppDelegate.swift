@@ -2,7 +2,6 @@ import Cocoa
 import CoreLocation
 import WeatherKit
 
-
 @main
 class AppDelegate : NSObject, CLLocationManagerDelegate, NSMenuDelegate, NSApplicationDelegate {
 	@IBOutlet
@@ -158,11 +157,16 @@ class AppDelegate : NSObject, CLLocationManagerDelegate, NSMenuDelegate, NSAppli
 
 	func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
 		manager.startUpdatingLocation()
+		locationManager(manager, didUpdateLocations: [ manager.location ].compactMap { $0 })
 	}
 
 	func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-		Task { await fetchWeatherDataForLocation(location: manager.location) }
-		geocodeLocation(location: locations.last)
+		guard let location = locations.last ?? manager.location else {
+			return
+		}
+
+		Task { await fetchWeatherDataForLocation(location: location) }
+		geocodeLocation(location: location)
 		scheduleUpdate()
 	}
 
