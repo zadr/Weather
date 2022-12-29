@@ -60,7 +60,7 @@ class AppDelegate : NSObject, CLLocationManagerDelegate, NSMenuDelegate, NSAppli
 
 		Task {
 			await fetchWeatherData(for: location)
-			await geocodeLocation(location: location)
+			await geocode(location: location)
 			await scheduleUpdate()
 		}
 	}
@@ -188,7 +188,7 @@ class AppDelegate : NSObject, CLLocationManagerDelegate, NSMenuDelegate, NSAppli
 	}
 
 	@WeatherActor
-	func geocodeLocation(location: CLLocation?) {
+	func geocode(location: CLLocation?) {
 		guard let location else { return }
 
 		CLGeocoder().reverseGeocodeLocation(location) { placemarks, error in
