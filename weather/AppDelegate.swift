@@ -2,6 +2,12 @@ import Cocoa
 import CoreLocation
 import WeatherKit
 
+@globalActor
+struct WeatherActor {
+	actor ActorType {}
+	static var shared: ActorType = ActorType()
+}
+
 @main
 class AppDelegate : NSObject, CLLocationManagerDelegate, NSMenuDelegate, NSApplicationDelegate {
 	@IBOutlet
@@ -30,6 +36,8 @@ class AppDelegate : NSObject, CLLocationManagerDelegate, NSMenuDelegate, NSAppli
 		}
 	}
 
+	// MARK: -
+
 	func menuWillOpen(_ menu: NSMenu) {
 		statusItem.button?.image?.isTemplate = true
 	}
@@ -38,6 +46,36 @@ class AppDelegate : NSObject, CLLocationManagerDelegate, NSMenuDelegate, NSAppli
 		statusItem.button?.image?.isTemplate = false
 	}
 
+	// MARK: -
+
+	func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+		manager.startUpdatingLocation()
+		locationManager(manager, didUpdateLocations: [ manager.location ].compactMap { $0 })
+	}
+
+	func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+		guard let location = locations.last ?? manager.location else {
+			return
+		}
+
+		Task {
+			await fetchWeatherData(for: location)
+			await geocodeLocation(location: location)
+			await scheduleUpdate()
+		}
+	}
+
+	// MARK: -
+
+	@MainActor
+	@objc func updateMenu() {
+		Task {
+			await fetchWeatherData(for: manager.location)
+			scheduleUpdate()
+		}
+	}
+
+	@MainActor
 	func buildMenuWithCurrentWeatherData(weather: Weather?, placemark: CLPlacemark?) {
 		guard let weather else {
 			return
@@ -135,14 +173,21 @@ class AppDelegate : NSObject, CLLocationManagerDelegate, NSMenuDelegate, NSAppli
 		statusItem.menu = menu
 	}
 
-	func fetchWeatherDataForLocation(location: CLLocation?) async {
+	// MARK: -
+
+	@WeatherActor
+	func fetchWeatherData(for location: CLLocation?) async {
 		guard let location else { return }
 
 		let weather = try? await WeatherService.shared.weather(for: location)
 		self.currentWeatherData = weather
-		self.buildMenuWithCurrentWeatherData(weather: weather, placemark: placemark)
+
+		Task {
+			await self.buildMenuWithCurrentWeatherData(weather: weather, placemark: placemark)
+		}
 	}
 
+	@WeatherActor
 	func geocodeLocation(location: CLLocation?) {
 		guard let location else { return }
 
@@ -155,26 +200,9 @@ class AppDelegate : NSObject, CLLocationManagerDelegate, NSMenuDelegate, NSAppli
 		}
 	}
 
-	func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-		manager.startUpdatingLocation()
-		locationManager(manager, didUpdateLocations: [ manager.location ].compactMap { $0 })
-	}
+	// MARK: -
 
-	func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-		guard let location = locations.last ?? manager.location else {
-			return
-		}
-
-		Task { await fetchWeatherDataForLocation(location: location) }
-		geocodeLocation(location: location)
-		scheduleUpdate()
-	}
-
-	@objc func updateMenu() {
-		Task { await fetchWeatherDataForLocation(location: manager.location) }
-		scheduleUpdate()
-	}
-
+	@MainActor
 	func scheduleUpdate() {
 		activeTimer?.invalidate()
 
